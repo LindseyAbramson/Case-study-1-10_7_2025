@@ -1,0 +1,137 @@
+---
+title: "Case Study"
+output: html_document
+date: "2025-10-07"
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readxl)
+library(haven)
+library(leaflet)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+
+```{r}
+library(p8105.datasets)
+
+data(nyc_airbnb)
+```
+
+
+## Brainstorm questions
+* Pick a neighborhood / borough, investigate price
+  * If we had dates, does that affect price?
+* Does the type of unit affect rating / price?
+* What about ZIP codes?
+* What rental has the highest reviews?
+* Are there any connections between price and other variables?
+* What about prices over time?
+  * Could we look at prices before and after the pandmeic?
+* How else did the pandemic affect Air BNB in NYC?
+* Does the name of the rental affect the price / rating?
+* What does the number of days available have to do with anything else?
+
+```{r}
+
+```
+
+## How does borough affect average price?
+```{r}
+nyc_airbnb |>
+  mutate(avg_price = mean(price)) |>
+  group_by(neighbourhood_group) |>
+  summarise(avg_price = mean(price, na.rm = TRUE))
+```
+Manhattan has the greatest average price of $180, followed by SI, Brooklyn, Queens, and the Bronx.
+
+## Focus in on Manhattan
+```{r}
+nyc_airbnb |>
+  filter(neighbourhood_group == "Manhattan",
+         price < 500,
+         room_type == "Entire home/apt") |>
+  mutate(neighbourhood = fct_reorder(neighbourhood, price)) |>
+  ggplot(aes(x = neighbourhood, y = price)) +
+  geom_violin() +
+  theme(axis.text.x = element_text(angle=90, hjust=1, vjust=0.5))
+```
+
+(remember to look at extreme values ...)
+```{r}
+nyc_airbnb |>
+  filter(price>9000) |>
+  view()
+```
+
+```{r}
+nyc_airbnb |>
+  filter(calculated_host_listings_count > 30)
+```
+
+
+## What about room type in a given neighborhood?
+```{r}
+nyc_airbnb |>
+  drop_na(price) |>
+  group_by(room_type, neighbourhood_group) |>
+  summarize(
+    avg_price = mean(price)
+  ) |>
+  pivot_wider(
+    names_from=room_type, 
+    values_from=avg_price
+  )
+```
+
+
+```{r}
+nyc_airbnb |>
+  count(neighbourhood_group, room_type)
+
+```
+
+Make some plots
+```{r}
+nyc_airbnb |>
+  ggplot(aes(x=price)) +
+  geom_histogram() +
+  facet_grid(room_type ~ neighbourhood_group) +
+  scale_x_continuous(limits = c(0, 1000)) 
+```
+
+
+## Leaflet
+```{r}
+pal <- colorNumeric(
+  palette = "viridis",
+  domain = nyc_airbnb$review_scores_location
+)
+
+nyc_airbnb |>
+  filter(
+    neighbourhood_group == "Manhattan",
+    room_type == "Entire home/apt") |>
+  leaflet() |>
+  addProviderTiles(providers$CartoDB.Positron) |>
+  addCircleMarkers(~lat, ~long, 
+                   color = ~pal(review_scores_location), radius=2) 
+```
+Need to render this to an HTML document!
